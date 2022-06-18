@@ -1,0 +1,9 @@
+erde$3$11
+start 1$3$12
+erde$4$11
+erde$5$11
+bone 5$10$12
+bone 1$14$13
+bone 5$17$12
+end 1$21$9
+gras$22$13
