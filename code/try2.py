@@ -1,3 +1,1 @@
-import pygame.font
-
-print(pygame.font.get_fonts())
+print(1==True)

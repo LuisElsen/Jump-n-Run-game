@@ -3,10 +3,7 @@ import pygame.surface
 
 
 class Window:
-    if config:
-        x_button = pygame.image.load(r"G:\info\python\Jump`n_run\Images\delete.png")
-    else:
-        x_button = pygame.image.load("Images/delete.png")
+    x_button = pygame.image.load("Images/delete.png")
     centered = "centered"
     stop = "stop"
 

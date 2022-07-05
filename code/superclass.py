@@ -1,6 +1,5 @@
 import pygame
 pygame.init()
-# from Enum import Enum, auto
 
 
 class SuperClass:
@@ -20,6 +19,6 @@ class SuperClass:
         self.rect = pygame.Rect([self.x, self.y, self.width, self.height])
 
     def draw(self, screen, added_value=0):
-        screen.blit(self.image, (self.x + added_value, screen.get_height() - self.y - self.image.get_height()))
+        screen.blit(self.image, (self.x - added_value, screen.get_height() - self.y - self.image.get_height()))
 
     

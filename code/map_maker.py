@@ -1,32 +1,43 @@
 import sys
 
-from field import Arrows
+import pygame.font
+
 from special_button import *
 import os
+from selected_methods import *
 
-
-buttons_fp = "Images/map images"
-special_fp = "Images/special buttons"
-if config:
-    buttons_fp = config + "/Images/map images"
-    special_fp = config + "/Images/special buttons"
+dir_path = "Images/map maker"
+get_class = {
+    "clear": Clear,
+    "save": Save,
+    "start": StartEnd,
+    "end": StartEnd,
+    "load": LoadFile,
+    "main": MainMenu,
+    "delete": Delete,
+    "lives": Lives,
+}
 
 
 def create_left_right_buttons():
     directory = "Images/other"
-    if config:
-        directory = config + "/Images/other"
     left_img = pygame.image.load(directory + "/" + "left.png")
     right_img = pygame.image.load(directory + "/" + "right.png")
-    left = Arrows(left_img, MENU_BAR+5)
+    left = Arrows(left_img, MENU_BAR + 5)
     left.command = left.move_map_left
     Arrows.buttons.append(left)
-    right = Arrows(right_img, WIDTH-right_img.get_width())
+    right = Arrows(right_img, WIDTH - right_img.get_width())
     right.command = right.move_map_right
     Arrows.buttons.append(right)
 
 
-def create_buttons(fp_directory, special: bool, reverse: bool, in_menu=None, add_x=0):
+def show_directory(cls, others):
+    cls.set_shown(True)
+    [other.set_shown(False) for other in others]
+    Button.show_unusual(True)
+
+
+def create_buttons(fp_directory, cls, reverse: bool, in_menu=None, add_x=0):
     fp_list = os.listdir(fp_directory)
     x = BUTTON_DIST + add_x
     if reverse:
@@ -35,25 +46,32 @@ def create_buttons(fp_directory, special: bool, reverse: bool, in_menu=None, add
         y = BUTTON_DIST
     for fp in fp_list:
         text = None
-        if special:
+        if cls == Special:
             text = fp.split(".")[0]  # remove .png
 
         img_fp = fp.split(".")[0]  # remove .png
+        if img_fp in selected_methods:
+            action = selected_methods[img_fp]
+        else:
+            action = False
         if in_menu:
             image = in_menu[1].render(text, True, white)
         else:
             image = pygame.image.load(fp_directory + "/" + fp)
-        if special:
+        if cls == Special:
+            cls = get_class[text.split()[0]]  # sum ting wong
             try:
                 num = int(text.split()[1])
                 text = text.split()[0]
-                button = Special(image, img_fp, x, y, text=text, num=num)
+                button = cls(image, img_fp, x, y, text=text, num=num, action=action)
             except IndexError:
-                button = Special(image, img_fp, x, y, text=text)
+                button = cls(image, img_fp, x, y, text=text, action=action)
             except ValueError:
-                button = Special(image, img_fp, x, y, text=text)
+                button = cls(image, img_fp, x, y, text=text, action=action)
+            finally:
+                cls = Special
         else:
-            button = Button(image, img_fp, x, y, text=text)
+            button = cls(image, img_fp, x, y, text=text, action=action)
 
         x += button.width + BUTTON_DIST
 
@@ -64,11 +82,9 @@ def create_buttons(fp_directory, special: bool, reverse: bool, in_menu=None, add
                 y += BUTTON_DIST + button.height
 
             x = BUTTON_DIST
-        if special:
-            Special.buttons.append(button)
-        else:
-            Button.buttons.append(button)
-        if special:
+        button.show = False
+        cls.buttons.append(button)
+        if cls == Special:
             if in_menu:
                 button.update_command(lambda: in_menu[0](text))
                 button.num = int(text.split()[1])
@@ -77,6 +93,37 @@ def create_buttons(fp_directory, special: bool, reverse: bool, in_menu=None, add
                     lambda t=text, b=button, *args, **kwargs: special_dict[t](b, *args, **kwargs))
         else:
             button.update_command(button.select_obstacle)
+
+
+def create_directories(path):
+    x = BUTTON_DIST
+    y = HEIGHT - BUTTON_DIST
+    Button.font = pygame.font.Font(font_name, 30)
+    for text in os.listdir(path):
+        if Special.fp.split("\\")[-1] == text:
+            cls = Special
+            others = Enemy, Button
+        elif Enemy.fp.split("\\")[-1] == text:
+            cls = Enemy
+            others = Special, Button
+        else:
+            cls = Button
+            others = Enemy, Special
+
+        def command(cls=cls, others=others):
+            cls.set_shown(True)
+            [other.set_shown(False) for other in others]
+            button.show_unusual(True)
+
+        button = Button(*Button.create_text_only(text, x, y),
+                        command=lambda cls=cls, others=others: command(cls, others))
+        Button.buttons.append(button)
+
+        x += button.width + BUTTON_DIST
+        if x + button.width > MENU_BAR:
+            y -= BUTTON_DIST + button.height
+            x = BUTTON_DIST
+    Button.font = pygame.font.Font(font_name, 20)
 
 
 def menu_loop(scrollable, all_buttons):
@@ -108,23 +155,28 @@ def menu_loop(scrollable, all_buttons):
 
 
 def map_maker(commands):
-    Special.main_menu = commands["main menu"]
-    Button.buttons = []
-    Special.buttons = []
-    Field.buttons = []
-    Arrows.buttons = []
+    # reset the board
+    MainMenu.main_menu = commands["main menu"]
+    Arrows.buttons.clear()
+    Special.buttons.clear()
+    Button.buttons.clear()
+    Field.buttons.clear()
 
     # sidebar buttons
-    create_buttons(buttons_fp, False, True)
-    create_buttons(special_fp, True, False)
+    create_directories(dir_path)
+    create_buttons(Button.fp, Button, False)
+    create_buttons(Special.fp, Special, False)
+    create_buttons(Enemy.fp, Enemy, False)
+    show_directory(Special, (Enemy, Button))
     # arrow buttons
     create_left_right_buttons()
-    all_buttons = Button.buttons + Special.buttons + Arrows.buttons
-    save_loop = False
+    save_loop = False  # for the window of the save loop
     # create mat to draw
     Field.create_fields()
-
+    description = None
+    selected_method = None
     while True:
+        all_buttons = Button.buttons + Special.buttons + Arrows.buttons + Enemy.buttons
         events = pygame.event.get()
         selected = [button for button in all_buttons if button.selected]
         if not save_loop:
@@ -154,18 +206,44 @@ def map_maker(commands):
                     button.command()
                     save_loop = True
                     Field.update_selected(None)
+                if type(button) == StartEnd:
+                    button.update_text()
         if not save_loop:
             if selected:
                 Field.update_selected(selected[0])
             for field in Field.buttons:
-                field.draw(screen, mx, my, pressed, Arrows.smallest, Field.buttons[-1].repr_x - Arrows.biggest)
+                if field.draw(screen, mx, my, pressed, Arrows.smallest, Field.buttons[-1].repr_x - Arrows.biggest):
+                    rv = Field.selected_button.run_action(field)
+                    if rv:
+                        description, selected_method = rv
+                    else:
+                        description, selected_method = None, None
 
         if save_loop:
             if selected:
-                if selected[0].save_in_loop(screen, mx, my, clicked, events):
-                    save_loop = False
-                    selected[0].selected = False
+                if type(selected[0]) == Save:
+                    stop, Save.map_name = selected[0].save_in_loop(screen, mx, my, clicked, events, selected[0].map_saver,
+                                                                   var=Save.map_name)
+                    if stop:
+                        save_loop = False
+                        selected[0].selected = False
+                elif type(selected[0]) == Lives:
+                    stop, Lives.lives = selected[0].save_in_loop(screen, mx, my, clicked, events,
+                                                                 selected[0].set_lives, var=str(Lives.lives))
+                    if stop:
+                        save_loop = False
+                        selected[0].selected = False
+                else:
+                    stop, _ = selected[0].save_in_loop(screen, mx, my, clicked, events)
+                    if stop:
+                        save_loop = False
+                        selected[0].selected = False
+        if description:
+            description.draw(screen, mx, my, clicked)
+
+        if selected_method:
+            rv = selected_method(events)
+            if rv:
+                description = rv
 
         pygame.display.update()
-
-

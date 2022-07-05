@@ -1,7 +1,10 @@
 import os
-
+import pygame.font
+import Button
 from Window import *
 from field import Field
+from Enemy import *
+import json
 
 pygame.init()
 BUTTON_DIST = HEIGHT / 10
@@ -11,29 +14,98 @@ class Special(Button):
     buttons = []
     info_font = pygame.font.Font(font_name, 40)
     button_font = pygame.font.Font(font_name, 60)
-    new_map = False
-    existing_maps = False
-    map_name = ""
-    map_folder = "Maps"
-    main_menu = None
+    fp = "Images\\map maker\\special actions"
 
-    def __init__(self, image: pygame.surface, img_path, x, y, command=None, text=None, num=None):
-        super().__init__(image, img_path, x, y, command=command, text=text, num=num)
+    @staticmethod
+    def create_text(text: str):
+        return Special.info_font.render(text, True, white)
+
+    @staticmethod
+    def check_valid() -> bool:
+        return Field.get_on_map("start") == 1 and Field.get_on_map("end") == 1  # not needed
+
+
+class LoadSaveSuper(Special):
+    map_folder = "Maps"
+    new_map = False
+
+    def __init__(self, image: pygame.surface, img_path, x, y, command=None, text=None, num=None, action=None):
+        super().__init__(image, img_path, x, y, command=command, text=text, num=num, action=action)
         self.win = None  # window for load and save file
         self.scroll = 0
 
-    # special methods
-    # save button methods
+    def create_existing_maps(self, method):
+        buttons = []
+        x = self.win.button_dist
+        y = x + 100
+        for file in os.listdir(self.map_folder):
+            text_img = Special.button_font.render(file.split(".")[0], True, white)
+            button = Button(text_img, False, x, self.win.height - y,
+                            command=lambda f=file: method(f.split(".")[0]))
+            buttons.append(button)
+            y += button.height + BUTTON_DIST / 2
+        self.win.update_text([])
+        self.win.update_buttons(buttons)
+
+    def save_in_loop(self, screen, mx, my, clicked, events, func=None, var=None, scroll=0):
+        if self.new_map:
+            for event in events:
+                if event.type == pygame.KEYDOWN:
+
+                    # Check for backspace
+                    if event.key == pygame.K_BACKSPACE:
+
+                        # get text input from 0 to -1 i.e. end.
+                        var = var[:-1]
+                    elif event.key == pygame.K_RETURN:
+                        if func(var):
+                            continue
+                        var = ""
+                        self.new_map = False
+                        break
+                    # Unicode standard is used for string
+                    # formation
+                    else:
+                        var += event.unicode
+                self.win.texts[1][0] = Special.create_text(var)
+        for event in events:
+            # set scroll
+            if event.type == MOUSEBUTTONDOWN:
+                if event.button == 4:
+                    self.scroll -= 50
+                elif event.button == 5:
+                    self.scroll += 50
+        # window actions
+        self.win.surface.fill((0, 0, 0))
+        x = screen.get_width() / 2 - self.win.surface.get_width() / 2
+        y = screen.get_height() / 2 - self.win.surface.get_height() / 2
+        if type(self.win) != Window:
+            raise TypeError("must use Special.save first")
+        else:
+            if self.win.draw(screen, (x, y), mx, my, clicked, scroll=self.scroll):
+                self.scroll = 0
+                self.new_map = False
+                return True, var
+
+        return False, var
+
+
+class Save(LoadSaveSuper):
+    existing_maps = False
+    map_name = ""
+
     def map_saver(self, name):
-        if Field.get_on_map("end 1") and Field.get_on_map("start 1"):
+        if Field.get_on_map("end 1") and Field.get_on_map("start 1"):  # checks if savable
             text = ""
-            with open(self.map_folder + "/" + name + ".txt", "w") as f:
+            with open(self.map_folder + "/" + name + ".json", "w") as f:
                 for field in Field.buttons:
                     field_name = repr(field)
                     if field_name.split("$")[0] != field.path and field_name.split("$")[0] != "clear":
+                        # if smth is on that field
                         text += field_name + "\n"
                 if text:
-                    f.write(text)
+                    text = {"map": text, "lives": Lives.get_lives()}
+                    json.dump(text, f)  # ???
             save_msg = Special.create_text("Map saved!")
             self.win.update_text([[save_msg, self.win.centered, self.win.centered]])
             self.new_map = False
@@ -57,43 +129,6 @@ class Special(Button):
         self.selected = True
         return 2
 
-    def save_in_loop(self, screen, mx, my, clicked, events, scroll=0):
-        if self.new_map:
-            for event in events:
-                if event.type == pygame.KEYDOWN:
-
-                    # Check for backspace
-                    if event.key == pygame.K_BACKSPACE:
-
-                        # get text input from 0 to -1 i.e. end.
-                        Special.map_name = Special.map_name[:-1]
-                    elif event.key == pygame.K_RETURN:
-                        self.map_saver(Special.map_name)
-                        Special.map_name = ""
-                        break
-                    # Unicode standard is used for string
-                    # formation
-                    else:
-                        Special.map_name += event.unicode
-                self.win.texts[1][0] = Special.create_text(Special.map_name)
-        for event in events:
-            # set scroll
-            if event.type == MOUSEBUTTONDOWN:
-                if event.button == 4:
-                    self.scroll += 50
-                elif event.button == 5:
-                    self.scroll -= 50
-        # window actions
-        self.win.surface.fill((0, 0, 0))
-        x = screen.get_width() / 2 - self.win.surface.get_width() / 2
-        y = screen.get_height() / 2 - self.win.surface.get_height() / 2
-        if type(self.win) != Window:
-            raise TypeError("must use Special.save first")
-        else:
-            if self.win.draw(screen, (x, y), mx, my, clicked, scroll=self.scroll):
-                self.scroll = 0
-                return True
-
     def user_input(self, new_map, buttons):
         for button in buttons:
             button.deiconify()
@@ -109,8 +144,40 @@ class Special(Button):
             self.win.update_text([[text, self.win.centered, 0],
                                   [Special.create_text(self.map_name), self.win.centered, self.win.centered]])
         else:
-            self.create_existing_maps(True)
+            self.create_existing_maps(self.map_saver)
 
+
+class LoadFile(LoadSaveSuper):
+    def load_file(self, file):  # actual file loader
+        for field in Field.buttons:
+            field.reset()
+        text = self.load_only(self.map_folder + "/" + file + ".json")
+        Lives.lives = text["lives"]
+        Field.set_fields(text["map"], special_dict, Special, Enemy)
+        return self.win.stop
+
+    @staticmethod
+    def load_only(location):  # formatting the map that's passed with location
+        with open(location, "r") as f:
+            text = json.load(f)
+            text["map"] = text["map"].split("\n")
+            for i in range(len(text["map"])):
+                if text["map"][i]:
+                    text["map"][i] = text["map"][i].split("$")
+                else:
+                    text["map"].pop(i)
+        return text
+
+    def file_load_window(self):
+        self.win = Window((800, 600), [], [])
+        self.create_existing_maps(self.load_file)
+        text = Special.create_text("Select a map:")
+        self.win.update_text([[text, self.win.centered, 0]])
+        return 2
+
+
+class StartEnd(Special):
+    # this method is called when u click the start or end button
     def start_end(self):
         rv = None
         self.num = 1 - Field.get_on_map(self.image_path)
@@ -119,76 +186,97 @@ class Special(Button):
         self.set_text(self.text_str.split()[0] + " " + str(1 - Field.get_on_map(self.image_path)), True)
         return rv
 
-    # ------------------------------------------------------------------------------------------------------------------
-    @staticmethod
-    def create_text(text: str):
-        return Special.info_font.render(text, True, white)
+    # this method updates the text od start and end button
+    def update_text(self):
+        self.set_text(self.text_str.split()[0] + " " + str(self.num), True)
 
+
+class Lives(LoadSaveSuper):
+    lives = 3
+
+    # this method is executed when the life button is clicked and sets up the window
+    def setup_window(self):
+        width, height = 800, 600
+        self.win = Window((width, height), [], [])
+        text = Special.info_font.render("Enter the number of hearts you want to have", True, white)
+        texts = [[text, Window.centered, text.get_height()],
+                 [Special.create_text(str(self.lives)), self.win.centered, self.win.centered]]
+        self.win.update_text(texts)
+        self.selected = True
+        self.new_map = True
+        return 2
+
+    # this method is run constantly when lives is selected
+    def set_lives(self, lives):
+        try:
+            lives = int(lives)
+            Lives.lives = lives
+            self.win.update_buttons([])
+            self.win.update_text([[Special.create_text("lives set"), Button.centered, Button.centered]])
+            self.new_map = False
+            return True
+        except ValueError:
+            self.win.update_text([self.win.texts[0], self.win.texts[1],
+                                  [Special.info_font.render("Enter a number", True, (255, 0, 0)), Button.centered,
+                                   self.win.get_height() - Special.info_font.get_height()]])
+            return True
+
+    @staticmethod
+    def get_lives():
+        return Lives.lives
+
+
+class Delete(LoadSaveSuper):
+    def setup_window(self):
+        width, height = 800, 600
+        self.win = Window((width, height), [], [])
+        self.create_existing_maps(self.user_check)
+        text = Special.button_font.render("Select a map you want to delete:", True, white)
+        texts = [[text, Window.centered, text.get_height()]]
+        self.win.update_text(texts)
+        return 2
+
+    def user_check(self, name):
+        text = Special.info_font.render("do you really want to delete " + name, True, (255, 255, 255))
+        Button.font = pygame.font.Font(font_name, 100)
+        buttons = [
+            Button(*Button.create_text_only("yes", 0, self.win.get_height() / 2 - 50),
+                   command=lambda n=name: self.delete_file(n)),
+            Button(*Button.create_text_only("no", self.win.get_width() / 2, self.win.get_height() / 2 - 50),
+                   command=self.setup_window)
+        ]
+        Button.font = pygame.font.Font(font_name, 20)
+        self.win.update_text([[text, Button.centered, 0]])
+        self.win.update_buttons(buttons)
+
+    def delete_file(self, name):
+        os.remove(self.map_folder + "\\" + name + ".json")
+        self.win.update_buttons([])
+        self.win.update_text(
+            [[Special.info_font.render("Map deleted!", True, white), Window.centered, Window.centered]])
+
+
+class Clear(Special):
     def clear(self):
         self.selected = True
         return True
 
-    @staticmethod
-    def check_valid() -> bool:
-        return Field.get_on_map("start") == 1 and Field.get_on_map("end")
 
-    def create_existing_maps(self, save):
-        buttons = []
-        x = self.win.button_dist
-        y = x
-        for file in os.listdir(self.map_folder):
-            text_img = Special.button_font.render(file.split(".")[0], True, white)
-            #  at the save Button
-            if save:
-                button = Button(text_img, False, x, self.win.height - y,
-                                command=lambda f=file: self.map_saver(f.split(".")[0]))
-                buttons.append(button)
-            # at the file load button
-            else:
-                button = Button(text_img, False, x, self.win.height - y, command=lambda f=file: self.load_file(f))
-                buttons.append(button)
-            y += button.height + BUTTON_DIST/2
-        self.win.update_text([])
-        self.win.update_buttons(buttons)
-
-    # file load methods
-    def load_file(self, file):
-        text = self.load_only(self.map_folder + "/" + file)
-        Field.set_fields(text, special_dict, Special)
-        return self.win.stop
-
-    @staticmethod
-    def load_only(location):  # formatting the map that's passed with location
-        with open(location, "r") as f:
-            text = f.read()
-            text = text.split("\n")
-            for i in range(len(text)):
-                if text[i]:
-                    t = text[i].split("$")
-                    t[1] = int(t[1])
-                    t[2] = int(t[2])
-                    text[i] = t
-                else:
-                    text.remove(text[i])
-        return text
-
-    def file_load_window(self):
-        self.win = Window((800, 600), [], [])
-        self.create_existing_maps(False)
-        text = Special.create_text("Select a map:")
-        self.win.update_text([[text, self.win.centered, 0]])
-        return 2
+class MainMenu(Special):
+    main_menu = None
 
     @staticmethod
     def go_to_main_menu(_):
-        Special.main_menu()
+        MainMenu.main_menu()
 
 
 special_dict = {
-        "clear": Special.clear,
-        "save": Special.save,
-        "start": Special.start_end,
-        "end": Special.start_end,
-        "load file": Special.file_load_window,
-        "main menu": Special.go_to_main_menu,
-    }
+    "clear": Clear.clear,
+    "save": Save.save,
+    "start": StartEnd.start_end,
+    "end": StartEnd.start_end,
+    "load file": LoadFile.file_load_window,
+    "main menu": MainMenu.go_to_main_menu,
+    "delete file": Delete.setup_window,
+    "lives": Lives.setup_window,
+}

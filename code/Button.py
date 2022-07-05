@@ -1,8 +1,6 @@
 import pygame
 from pygame.locals import *
 import time
-print(pygame.font.get_fonts())
-config = False  # for no permissions in school
 font_name = None
 white = (255, 255, 255)
 
@@ -22,7 +20,7 @@ def timer(func):
     def wrapper(*args, **kwargs):
         start = time.time()
         rv = func(*args, **kwargs)
-        print(1 / (time.time() - start))
+        print(func, ": ", 1 / (time.time() - start))
         return rv
     return wrapper
 
@@ -31,8 +29,10 @@ class Button:
     buttons = []
     font = pygame.font.Font(font_name, 20)
     centered = "centered"
+    fp = "Images\\map maker\\normal blocks"
 
-    def __init__(self, image: pygame.surface, img_path, x, y, command=None, text=None, num=None):
+    def __init__(self, image: pygame.surface, img_path, x, y, command=None, text=None, num=None, action=None):
+        self.action = action
         self.image = image  # blitted img
         self.image_path = img_path  # img file path
         self.width = image.get_width()  # width and height of img
@@ -82,19 +82,16 @@ class Button:
                 except AttributeError:
                     self.draw_only(screen, self.image, (self.x, self.y + add_y))
             if clicked:
-                try:
-                    if add_x <= self.repr_x <= biggest:
-                        if self.x - add_x * 50 < mouse_x < self.x - add_x * 50 + self.width and \
-                                self.y + add_y < mouse_y < self.y + add_y + self.height:
-                            if self.command:
+                if self.command:
+                    try:
+                        if add_x <= self.repr_x <= biggest:
+                            if self.x - add_x * 50 < mouse_x < self.x - add_x * 50 + self.width and \
+                                    self.y + add_y < mouse_y < self.y + add_y + self.height:
                                 return self.command()
-                except AttributeError:
-                    if self.x < mouse_x < self.x + self.width and self.y + add_y < mouse_y < self.y + add_y + self.height:
-                        if self.command:
-                            # print(f"self {self}, cmd {self.command}")
+                    except AttributeError:
+                        if self.x < mouse_x < self.x + self.width and self.y + add_y < mouse_y < self.y + add_y + self.height:
                             return self.command()
-                    elif self.selected:
-                        if self.command:
+                        elif self.selected:
                             return self.command()
 
     @staticmethod
@@ -108,6 +105,12 @@ class Button:
         self.selected = True
         return 1
 
+    @classmethod
+    def show_unusual(cls, mode: bool):
+        for button in cls.buttons:
+            if button.command != button.select_obstacle:
+                button.show = mode
+
     @staticmethod
     def unselect_obstacle(buttons: list):
         for button in buttons:
@@ -116,8 +119,9 @@ class Button:
     @classmethod
     def get_instance(cls, img_path):
         for instance in cls.buttons:
-            if instance.image_path.split()[0] == img_path.split()[0]:
-                return instance
+            if instance.image_path:
+                if instance.image_path.split()[0] == img_path.split()[0]:
+                    return instance
 
     @staticmethod
     def create_text(text, x, y):
@@ -131,6 +135,20 @@ class Button:
         if y == Button.centered:
             y = HEIGHT / 2 - text_img.get_height() / 2
         return text_img, False, x, y
+
+    @staticmethod
+    def set_description(text):
+        img = Button.font.render(text, True, white)
+        return Button(img, False, WIDTH/2-img.get_width()/2, HEIGHT-img.get_height())
+
+    def run_action(self, field):
+        if self.action:
+            return self.action(field)
+
+    @classmethod
+    def set_shown(cls, mode: bool):
+        for button in cls.buttons:
+            button.show = mode
 
     def __repr__(self):
         return self.image_path

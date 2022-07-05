@@ -1,4 +1,3 @@
-from map_maker import *
 from game import *
 
 
@@ -23,8 +22,6 @@ commands = {
 
 def create_menu(directory):
     scroll = False
-    if config:
-        directory = config + "/" + directory
     fp_list = os.listdir(directory)
     x = BUTTON_DIST
     y = x

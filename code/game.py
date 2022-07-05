@@ -1,38 +1,35 @@
-import pdb
-from Obstacle import *
 import pygame.font
-import sys
-
+from monster import *
 from map_maker import *
 import player as play
-FPS = 240
+
 TIME_PER_ITERATION = 1/FPS
+special_loads = {
+    "start 1": Start,
+    "end 1": End,
+    "bone": UseOneTime,
+    "cannon": StraightCannon,
+
+}
 
 
 def load_map(name):
-    def configuration(n):
-        if config:
-            return config + "/Maps/" + n
-        else:
-            return "Maps/" + n
+    name = "Maps/" + name
 
-    name = configuration(name)
-
-    text = Special.load_only(name)
-    for t in text:
-        if t[0] == "start 1":
-            Obstacle.buttons.append(Start.from_str(t))
-        elif t[0] == "end 1":
-            Obstacle.buttons.append(End.from_str(t))
-        elif t[0].startswith("bone"):
-            Obstacle.buttons.append(UseOneTime.from_str(t))
+    text = LoadFile.load_only(name)
+    play.Player.hit_points = int(text["lives"])
+    for t in text["map"]:
+        for name in special_loads:
+            if t[0].startswith(name):
+                Obstacle.buttons.append(special_loads[name].from_str(t))
+                break
         else:
             Obstacle.buttons.append(Obstacle.from_str(t))
 
 
 def game_menu(main_menu=None):
     if main_menu:
-        Special.main_menu = main_menu["main menu"]
+        MainMenu.main_menu = main_menu["main menu"]
     Obstacle.buttons.clear()
     UseOneTime.buttons.clear()
     Start.buttons.clear()
@@ -40,16 +37,13 @@ def game_menu(main_menu=None):
     Button.buttons = []
     scroll = False
     Button.font = pygame.font.Font(font_name, 150)
-    if config:
-        paths = os.listdir(config + "/" + Special.map_folder)
-    else:
-        paths = os.listdir(Special.map_folder)
+    paths = os.listdir(Save.map_folder)
     x = BUTTON_DIST
     y = x
     Button.create_text("choose a Map", Button.centered, HEIGHT - Button.font.get_height())
     Button.buttons.append(
         Button(*Button.create_text_only("Main Menu", Button.centered, HEIGHT - 2 * Button.font.get_height()),
-               command=lambda: (Button.buttons.clear(), Special.go_to_main_menu(None))))
+               command=lambda: (Button.buttons.clear(), MainMenu.go_to_main_menu(None))))
 
     for path in paths:
         text = path.split(".")[0]
@@ -76,10 +70,7 @@ def game(map_name, commands):
     load_map(map_name)
 
     # player
-    if config:
-        img_path = config + "/" + "Images/player.png"
-    else:
-        img_path = "Images/player.png"
+    img_path = "Images/player.png"
     player_img = pygame.image.load(img_path)
     cords = get_player_spawn()
     player = play.Player(player_img, img_path, *cords)
@@ -98,11 +89,11 @@ def game(map_name, commands):
         # movement
         movement = pygame.key.get_pressed()[pygame.K_LEFT], pygame.key.get_pressed()[pygame.K_RIGHT]
 
-        can_jump, rv = player.draw_player(screen, Obstacle.buttons, movement)
+        can_jump, rv = player.draw_player(screen, Obstacle.buttons, movement, MENU_BAR)
         if rv:
             break
         for obstacle in Obstacle.buttons:
-            obstacle.draw(screen)
+            obstacle.draw(screen, player.x - MENU_BAR)
 
         required_time = time.time()-start
         if required_time < TIME_PER_ITERATION:
@@ -117,6 +108,8 @@ def game(map_name, commands):
         Start.buttons.clear()
         End.buttons.clear()
         Button.buttons = []
+        StraightCannon.balls.clear()
+        StraightCannon.reset_count()
         game(map_name, commands)
 
 

@@ -1,6 +1,4 @@
-from superclass import *
-from Obstacle import End
-from Button import timer
+from monster import *
 
 
 class Player(SuperClass):
@@ -8,6 +6,8 @@ class Player(SuperClass):
     SPEED = 1.7
     GRAVITY = -0.045
     on_ground = False
+    heart_img = pygame.image.load("Images/heart.png")
+    hit_points = 3
 
     def __init__(self, image: pygame.Surface, img_path, x, y):
         super().__init__(image, img_path, x, y)
@@ -25,10 +25,23 @@ class Player(SuperClass):
         self.x += self.SPEED * direction
 
     # main player function including obstacle collision
-    def draw_player(self, screen: pygame.Surface, obstacles: list, movement):
+    def draw_player(self, screen: pygame.Surface, obstacles: list, movement, add):
         self.set_last()
         self.add_gravity()
+        on_ground, rv = self.complete_collision(obstacles, movement)
+        if StraightCannon.draw_balls(screen, self, self.x - add):
+            Player.hit_points -= 1
+        self.draw_hearts(screen)
+        self.draw(screen, self.x - add)
+        if Player.hit_points <= 0:
+            return on_ground, 2
+        return on_ground, rv
+
+    def complete_collision(self, obstacles, movement):
         for obstacle in obstacles:
+            if issubclass(type(obstacle), Monster):
+                if obstacle.action():
+                    obstacles.remove(obstacle)
             if type(obstacle) == End:
                 if self.top_collision(obstacle):
                     return False, True
@@ -54,7 +67,7 @@ class Player(SuperClass):
             coll = self.left_right_collision(obstacle)
             if coll:
                 self.handle_left_right(coll)
-        self.draw(screen)
+
         return on_ground, False
 
     def add_gravity(self):
@@ -91,7 +104,8 @@ class Player(SuperClass):
             self.y = self.last_y
             self.jumping = False
             Player.on_ground = True
-            return obstacle.action()
+            if not issubclass(type(obstacle), Monster):
+                return obstacle.action()
         elif side == self.bottom:
             self.power = 0
             self.y = obstacle.y - self.height
@@ -103,6 +117,13 @@ class Player(SuperClass):
     def set_last(self):
         self.last_x = self.x
         self.last_y = self.y
+
+    def draw_hearts(self, screen):
+        add_x = 0
+        space = 5
+        for _ in range(self.hit_points):
+            screen.blit(Player.heart_img, (0 + add_x, 0))
+            add_x += space+Player.heart_img.get_width()
 
     def __repr__(self):
         return f"x = {self.x}, y = {self.y}"

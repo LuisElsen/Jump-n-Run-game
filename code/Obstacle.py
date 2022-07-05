@@ -1,12 +1,10 @@
 from superclass import *
+FPS = 240
 
 
 class Obstacle(SuperClass):
     buttons = []
-    folder = "Images\\map images\\"
-
-    def __init__(self, image: pygame.Surface, img_path, x, y):
-        super().__init__(image, img_path, x, y)
+    folder = "Images\\map maker\\normal blocks\\"
 
     @classmethod
     def from_str(cls, name: list):
@@ -19,19 +17,19 @@ class Obstacle(SuperClass):
 
 
 class Start(Obstacle):
-    folder = "Images\\special buttons\\"
+    folder = "Images\\map maker\\special actions\\"
 
 
 class UseOneTime(Obstacle):
-    folder = "Images\\map images\\"
+    folder = "Images\\map maker\\normal blocks\\"
     count_per_num = 30
 
     def __init__(self, image: pygame.Surface, img_path, x, y):
         self.count = UseOneTime.count_per_num * int(img_path.split()[-1].split(".")[0])
+        # by bone image num get the count, depending on how broken the bone is, it changes
         super().__init__(image, img_path, x, y)
 
     def action(self):
-        print(self.count)
         self.count -= 1
         self.image_path = f"bone {int(self.count/self.count_per_num)+1}.png"
         self.image = pygame.image.load(self.folder + self.image_path)
@@ -40,4 +38,4 @@ class UseOneTime(Obstacle):
 
 
 class End(Obstacle):
-    folder = "Images\\special buttons\\"
+    folder = "Images\\map maker\\special actions\\"
