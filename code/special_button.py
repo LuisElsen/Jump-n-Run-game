@@ -5,6 +5,7 @@ from Window import *
 from field import Field
 from Enemy import *
 import json
+from pymongo import MongoClient
 
 pygame.init()
 BUTTON_DIST = HEIGHT / 10
@@ -28,6 +29,11 @@ class Special(Button):
 class LoadSaveSuper(Special):
     map_folder = "Maps"
     new_map = False
+    cluster = MongoClient(
+        "mongodb+srv://NextTimeBro:LostThePasswordToqu@cluster0.ocuhchc.mongodb.net/?retryWrites=true&w=majority")
+    db = cluster["jump_n_run_maps"]
+    if os.path.exists("../name.txt"):
+        collection = db[open("../name.txt", "r").read()]
 
     def __init__(self, image: pygame.surface, img_path, x, y, command=None, text=None, num=None, action=None):
         super().__init__(image, img_path, x, y, command=command, text=text, num=num, action=action)
@@ -38,16 +44,17 @@ class LoadSaveSuper(Special):
         buttons = []
         x = self.win.button_dist
         y = x + 100
-        for file in os.listdir(self.map_folder):
-            text_img = Special.button_font.render(file.split(".")[0], True, white)
+        for file in self.collection.find():
+            text_img = Special.button_font.render(file["name"].split("\\")[1].split(".")[0], True, white)
             button = Button(text_img, False, x, self.win.height - y,
-                            command=lambda f=file: method(f.split(".")[0]))
+                            command=lambda f=file: method(f["name"].split("\\")[1].split(".")[0]))
             buttons.append(button)
             y += button.height + BUTTON_DIST / 2
         self.win.update_text([])
         self.win.update_buttons(buttons)
 
     def save_in_loop(self, screen, mx, my, clicked, events, func=None, var=None, scroll=0):
+        LoadSaveSuper.update_collection()
         if self.new_map:
             for event in events:
                 if event.type == pygame.KEYDOWN:
@@ -89,6 +96,10 @@ class LoadSaveSuper(Special):
 
         return False, var
 
+    @staticmethod
+    def update_collection():
+        LoadSaveSuper.collection = LoadSaveSuper.db[open("../name.txt", "r").read()]
+
 
 class Save(LoadSaveSuper):
     existing_maps = False
@@ -97,15 +108,14 @@ class Save(LoadSaveSuper):
     def map_saver(self, name):
         if Field.get_on_map("end 1") and Field.get_on_map("start 1"):  # checks if savable
             text = ""
-            with open(self.map_folder + "/" + name + ".json", "w") as f:
-                for field in Field.buttons:
-                    field_name = repr(field)
-                    if field_name.split("$")[0] != field.path and field_name.split("$")[0] != "clear":
-                        # if smth is on that field
-                        text += field_name + "\n"
-                if text:
-                    text = {"map": text, "lives": Lives.get_lives()}
-                    json.dump(text, f)  # ???
+            for field in Field.buttons:
+                field_name = repr(field)
+                if field_name.split("$")[0] != field.path and field_name.split("$")[0] != "clear":
+                    # if smth is on that field
+                    text += field_name + "\n"
+            if text:
+                text = {"map": text, "lives": Lives.get_lives(), "name": self.map_folder + "\\" + name + ".json"}
+                self.collection.insert_one(text)
             save_msg = Special.create_text("Map saved!")
             self.win.update_text([[save_msg, self.win.centered, self.win.centered]])
             self.new_map = False
@@ -151,17 +161,16 @@ class LoadFile(LoadSaveSuper):
     def load_file(self, file):  # actual file loader
         for field in Field.buttons:
             field.reset()
-        text = self.load_only(self.map_folder + "/" + file + ".json")
+        text = self.load_only(self.map_folder + "\\" + file + ".json")
         Lives.lives = text["lives"]
         Field.set_fields(text["map"], special_dict, Special, Enemy)
         return self.win.stop
 
     @staticmethod
     def load_only(location):  # formatting the map that's passed with location
-        with open(location, "r") as f:
-            text = json.load(f)
-            text["map"] = text["map"].split("\n")
-            for i in range(len(text["map"])):
+        text = LoadSaveSuper.collection.find({"name": location})[0]
+        text["map"] = text["map"].split("\n")
+        for i in range(len(text["map"])):
                 if text["map"][i]:
                     text["map"][i] = text["map"][i].split("$")
                 else:
@@ -250,7 +259,7 @@ class Delete(LoadSaveSuper):
         self.win.update_buttons(buttons)
 
     def delete_file(self, name):
-        os.remove(self.map_folder + "\\" + name + ".json")
+        self.collection.delete_one({"name": name})
         self.win.update_buttons([])
         self.win.update_text(
             [[Special.info_font.render("Map deleted!", True, white), Window.centered, Window.centered]])

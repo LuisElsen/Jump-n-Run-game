@@ -1,4 +1,5 @@
 from game import *
+import tkinter
 
 
 def menu():
@@ -30,7 +31,7 @@ def create_menu(directory):
         text = fp.split(".")[0]  # remove .png
         image = pygame.image.load(directory + "/" + fp)
         image_y = HEIGHT - 2 * BUTTON_DIST
-        image = pygame.transform.scale(image, [image.get_width()*image_y/image.get_height(), image_y])
+        image = pygame.transform.scale(image, [image.get_width() * image_y / image.get_height(), image_y])
         button = Button(image, fp, x, y, text=text)
         button.command = commands[text]
         Button.buttons.append(button)
@@ -44,4 +45,15 @@ def create_menu(directory):
 
 
 if __name__ == '__main__':
-    menu()
+    if os.path.exists("../name.txt"):
+        menu()
+    else:
+        win = tkinter.Tk()
+        tkinter.Label(win, text="tell us your name").grid(row=0, column=0)
+        box = tkinter.Entry(win)
+        box.grid(row=1, column=0)
+        tkinter.Button(win, text="Submit", command=lambda: (
+            open("../name.txt", "w").write(box.get()), tkinter.Label(text="you can close this window now")
+            .grid(row=3, column=0))).grid(row=2, column=0)
+
+        win.mainloop()

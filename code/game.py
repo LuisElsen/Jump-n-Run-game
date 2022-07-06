@@ -14,8 +14,6 @@ special_loads = {
 
 
 def load_map(name):
-    name = "Maps/" + name
-
     text = LoadFile.load_only(name)
     play.Player.hit_points = int(text["lives"])
     for t in text["map"]:
@@ -37,7 +35,7 @@ def game_menu(main_menu=None):
     Button.buttons = []
     scroll = False
     Button.font = pygame.font.Font(font_name, 150)
-    paths = os.listdir(Save.map_folder)
+    paths = LoadSaveSuper.collection.find()
     x = BUTTON_DIST
     y = x
     Button.create_text("choose a Map", Button.centered, HEIGHT - Button.font.get_height())
@@ -46,9 +44,9 @@ def game_menu(main_menu=None):
                command=lambda: (Button.buttons.clear(), MainMenu.go_to_main_menu(None))))
 
     for path in paths:
-        text = path.split(".")[0]
+        text = path["name"].split("\\")[1].split(".")[0]
         image = Button.font.render(text, True, white)
-        Button.buttons.append(Button(image, path, x, y, command=lambda fp=path: game(fp, main_menu)))
+        Button.buttons.append(Button(image, path, x, y, command=lambda fp=path["name"]: game(fp, main_menu)))
         x += image.get_width() + BUTTON_DIST
         if x + image.get_width() + BUTTON_DIST > WIDTH:
             x = BUTTON_DIST
