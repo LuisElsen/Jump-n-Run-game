@@ -9,7 +9,6 @@ special_loads = {
     "end 1": End,
     "bone": UseOneTime,
     "cannon": StraightCannon,
-
 }
 
 
